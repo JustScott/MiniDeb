@@ -17,13 +17,20 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # TODO: Add logic for selecting disk
+# TODO: Check that disk and partitions exist before running
 disk="/dev/vda"
 efi_partition="/dev/vda1"
 root_partition="/dev/vda2"
 
+# TODO: Add section for checking that all needed files are accessible
+
 INSTALLATION_VARIABLES_FILE=/tmp/activate_installation_variables.sh
 
 PRETTY_OUTPUT_LIBRARY=./MiniDeb/pretty_output_library.sh
+
+COMPLETION_FILE="start_install_completion.txt"
+
+export DEBIAN_FRONTEND=noninteractive
 
 if ! source $PRETTY_OUTPUT_LIBRARY &>/dev/null
 then
@@ -93,93 +100,233 @@ then
     exit 1
 fi
 
+# We should remove the admin_password from the install variables file
+# if set_admin_password isn't in the completion file, because it could
+# mean the user wants to enter a new password
+if ! grep "^set_admin_password$" $COMPLETION_FILE &>/dev/null
+then
+    sed -i '/^admin_password=/d' $INSTALLATION_VARIABLES_FILE
+fi
 if ! grep "^admin_password=" $INSTALLATION_VARIABLES_FILE &>/dev/null
 then
     clear 
     echo -e "* Prompt [1/2] *\n"
     get_user_password "administrator"
+    if [[ -z "$user_password" ]]
+    then
+        printf "\n\n\e[31m%s\e[0m\n\n" "[!] Must set admin password... stopping"
+        exit 1
+    fi
+
     echo -e "\nadmin_password=\"$user_password\"" >> $INSTALLATION_VARIABLES_FILE
+
+    echo "set_admin_password" >> $COMPLETION_FILE
 fi
 
+if ! grep "^set_username$" $COMPLETION_FILE &>/dev/null
+then
+    sed -i '/^username=/d' $INSTALLATION_VARIABLES_FILE
+fi
 if ! grep "^username=" $INSTALLATION_VARIABLES_FILE &>/dev/null
 then
     clear
     echo -e "* Prompt [2/2] *\n"
     echo ' - Set User Name - '
     get_name
-    if [[ -z "$name" ]]; then
-        echo -e \
-            "\n - [ERROR] Failed to get a user name, this shouldn't happen... stopping - \n"
+    if [[ -z "$name" ]]
+    then
+        printf "\n\n\e[31m%s\e[0m\n\n" "[!] Must set username... stopping"
         exit 1
     fi
     echo -e "\nusername=\"$name\"" >> $INSTALLATION_VARIABLES_FILE
+
+    echo "set_username" >> $COMPLETION_FILE
 fi
 
-apt update >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Update apt"
-[[ $? -ne 0 ]] && exit 1
+clear
 
-apt install -y arch-install-scripts debootstrap \
-    >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" \
-    "Install arch-install-scripts and debootstrap"
-[[ $? -ne 0 ]] && exit 1
+if ! cmp -s ./MiniDeb/configuration_files/sources.list \
+    /etc/apt/sources.list &>/dev/null
+then
+    cp ./MiniDeb/configuration_files/sources.list /etc/apt/sources.list \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Copy sources.list to the current live system"
+    [[ $? -ne 0 ]] && exit 1
+fi
 
-echo 'y' | mkfs.fat -F 32 /dev/vda1 \
-    >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Format boot partition with FAT32"
-[[ $? -ne 0 ]] && exit 1
-echo 'y' | mkfs.ext4 /dev/vda2 \
-    >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Configure System For EXT4"
-[[ $? -ne 0 ]] && exit 1
+if ! cmp -s /usr/share/zoneinfo/America/Chicago /etc/localtime &>/dev/null
+then
+    ln -sf /usr/share/zoneinfo/America/Chicago /etc/localtime \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Set live system timezone: 'America/Chicago'"
+    [[ $? -ne 0 ]] && exit 1
+fi
 
-mount /dev/vda2 /mnt >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Mount the root partition"
-[[ $? -ne 0 ]] && exit 1
+if ! grep "^apt_update$" $COMPLETION_FILE &>/dev/null
+then
+    apt-get update >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Update apt"
+    [[ $? -ne 0 ]] && exit 1
 
-mount --mkdir /dev/vda1 /mnt/boot >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Mount the boot partition"
-[[ $? -ne 0 ]] && exit 1
+    echo "apt_update" >> $COMPLETION_FILE
+fi
 
-mkswap -U clear --size 4G --file /mnt/swapfile \
-    >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Create 4GB swapfile"
-[[ $? -ne 0 ]] && exit 1
+if ! grep "^apt_upgrade$" $COMPLETION_FILE &>/dev/null
+then
+    apt-get upgrade --yes >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "upgrade live system with apt"
+    [[ $? -ne 0 ]] && exit 1
 
-swapon /mnt/swapfile >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Enable the swapfile"
-[[ $? -ne 0 ]] && exit 1
+    echo "apt_upgrade" >> $COMPLETION_FILE
+fi
 
-debootstrap --arch amd64 stable /mnt https://deb.debian.org/debian \
-    >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Run debootstrap"
-[[ $? -ne 0 ]] && exit 1
+if ! grep "^apt_install_debootstrap$" $COMPLETION_FILE &>/dev/null
+then
+    apt-get install --yes arch-install-scripts debootstrap \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" \
+        "Install arch-install-scripts and debootstrap"
+    [[ $? -ne 0 ]] && exit 1
 
-genfstab -U /mnt > /mnt/etc/fstab >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Generate the fstab file"
-[[ $? -ne 0 ]] && exit 1
+    echo "apt_install_debootstrap" >> $COMPLETION_FILE
+fi
 
-cp /etc/hosts /mnt/etc/hosts >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Copy the hosts file to the new system"
-[[ $? -ne 0 ]] && exit 1
+if ! grep "^mkfs_boot$" $COMPLETION_FILE &>/dev/null
+then
+    echo 'y' | mkfs.fat -F 32 /dev/vda1 \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Format boot partition with FAT32"
+    [[ $? -ne 0 ]] && exit 1
 
-cp ./MiniDeb/configuration_files/sources.list /mnt/etc/apt/sources.list \
-    >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Copy sources.list to the new system"
-[[ $? -ne 0 ]] && exit 1
+    echo "mkfs_boot" >> $COMPLETION_FILE
+fi
 
-echo "debian" > /mnt/etc/hostname >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Set the new systems hostname to 'debian'"
-[[ $? -ne 0 ]] && exit 1
+if ! grep "^mkfs_root$" $COMPLETION_FILE &>/dev/null
+then
+    echo 'y' | mkfs.ext4 /dev/vda2 \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Configure System For EXT4"
+    [[ $? -ne 0 ]] && exit 1
 
-{
-    cp $PRETTY_OUTPUT_LIBRARY /mnt
-    cp ./MiniDeb/finish_install.sh /mnt
-    cp $INSTALLATION_VARIABLES_FILE /mnt
-} >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" \
-    "Copy over finish_install.sh to the new system"
-[[ $? -ne 0 ]] && exit 1
+    echo "mkfs_root" >> $COMPLETION_FILE
+fi
+
+if ! grep "^mount_root$" $COMPLETION_FILE &>/dev/null
+then
+    mount /dev/vda2 /mnt >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Mount the root partition"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "mount_root" >> $COMPLETION_FILE
+fi
+
+if ! grep "^mount_boot$" $COMPLETION_FILE &>/dev/null
+then
+    mount --mkdir /dev/vda1 /mnt/boot/efi \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Mount the boot partition"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "mount_boot" >> $COMPLETION_FILE
+fi
+
+if ! grep "^mkswap$" $COMPLETION_FILE &>/dev/null
+then
+    mkswap -U clear --size 4G --file /mnt/swapfile \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Create 4GB swapfile"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "mkswap" >> $COMPLETION_FILE
+fi
+
+if ! grep "^swapon$" $COMPLETION_FILE &>/dev/null
+then
+    swapon /mnt/swapfile >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Enable the swapfile"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "swapon" >> $COMPLETION_FILE
+fi
+
+if ! grep "^run_debootstrap$" $COMPLETION_FILE &>/dev/null
+then
+    debootstrap --arch amd64 stable /mnt https://deb.debian.org/debian \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Run debootstrap (this could take a while on slow internet)"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "run_debootstrap" >> $COMPLETION_FILE
+fi
+
+if ! grep "^genfstab$" $COMPLETION_FILE &>/dev/null
+then
+    genfstab -U /mnt > /mnt/etc/fstab 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Generate the fstab file"
+    if [[ $? -ne 0 ]]
+    then
+        printf "\n\n\e[31m%s\n%s\n%s\e[0m\n\n" \
+            "[!] It's likely debootstrap failed, and not genfstab" \
+            "     - try removing 'debootstrap' from the completion" \
+            "       file and running again"
+        exit 1
+    fi
+
+    echo "genfstab" >> $COMPLETION_FILE
+fi
+
+if ! cmp -s /etc/hosts /mnt/etc/hosts &>/dev/null
+then
+    cp /etc/hosts /mnt/etc/hosts >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Copy the hosts file to the new system"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+if ! cmp -s ./MiniDeb/configuration_files/sources.list \
+    /mnt/etc/apt/sources.list &>/dev/null
+then
+    cp ./MiniDeb/configuration_files/sources.list /mnt/etc/apt/sources.list \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Copy sources.list to the new system"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+if ! grep "^set_hostname$" $COMPLETION_FILE &>/dev/null
+then
+    echo "debian" > /mnt/etc/hostname >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Set the new systems hostname to 'debian'"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "set_hostname" >> $COMPLETION_FILE
+fi
+
+if ! cmp -s $PRETTY_OUTPUT_LIBRARY \
+    /mnt/$(basename $PRETTY_OUTPUT_LIBRARY) &>/dev/null
+then
+    cp $PRETTY_OUTPUT_LIBRARY /mnt/ \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" \
+        "Copy '$PRETTY_OUTPUT_LIBRARY' to the new system"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+if ! cmp -s ./MiniDeb/finish_install.sh /mnt/finish_install.sh &>/dev/null
+then
+    cp ./MiniDeb/finish_install.sh /mnt \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" \
+        "Copy 'finish_install.sh' to the new system"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+if ! cmp -s $INSTALLATION_VARIABLES_FILE \
+    /mnt/$(basename $INSTALLATION_VARIABLES_FILE) &>/dev/null
+then
+    cp $INSTALLATION_VARIABLES_FILE /mnt/ \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" \
+        "Copy '$INSTALLATION_VARIABLES_FILE' to the new system"
+    [[ $? -ne 0 ]] && exit 1
+fi
 
 arch-chroot /mnt /bin/bash finish_install.sh
