@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pretty_output_library - part of the MiniDeb project
+# pretty_output_library - part of the DebianInstaller project
 # Copyright (C) 2026, JustScott, development@justscott.me
 #
 # This program is free software: you can redistribute it and/or modify

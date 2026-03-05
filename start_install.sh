@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# start_install.sh - part of the MiniDeb project
+# start_install.sh - part of the DebianInstaller project
 # Copyright (C) 2026, JustScott, development@justscott.me
 #
 # This program is free software: you can redistribute it and/or modify

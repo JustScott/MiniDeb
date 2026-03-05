@@ -1,4 +1,4 @@
-# MiniDeb
+# DebianInstaller
 
 Scripts to setup a minimal, opinionated, Gnome-based Debian Linux system.
 
@@ -10,14 +10,14 @@ and run `start_install.sh`:
 ```bash
 apt update
 apt install git
-git clone https://www.github.com/JustScott/MiniDeb
-bash ./MiniDeb/start_install.sh
+git clone https://www.github.com/JustScott/DebianInstaller
+bash ./DebianInstaller/start_install.sh
 ```
 
 ### Script Completion Handling
 A `start_install_completion.txt` file is created as the script is
 ran so that if any command in the script fails, you can resolve
-the issue and run `bash ./MiniDeb/start_install.sh` again for it
+the issue and run `bash ./DebianInstaller/start_install.sh` again for it
 to start after the last successfully ran command.
   * If you want to restart the script, just delete the completion
     file
