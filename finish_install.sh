@@ -101,10 +101,16 @@ EOF
 
 if ! grep "^apt_install_system_packages$" $COMPLETION_FILE &>/dev/null
 then
-    apt-get install --yes gnome locales efibootmgr efivar linux-image-amd64 \
+    apt-get install --no-install-recommends --yes gnome-core \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Install gnome"
+    [[ $? -ne 0 ]] && exit 1
+
+    apt-get install --yes locales \
+        git efibootmgr efivar linux-image-amd64 \
         grub-efi-amd64-bin network-manager sudo \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Install system packages and gnome"
+    task_output $! "$STDERR_LOG_PATH" "Install system packages"
     [[ $? -ne 0 ]] && exit 1
 
     echo "apt_install_system_packages" >> $COMPLETION_FILE
