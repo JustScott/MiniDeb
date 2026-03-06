@@ -40,7 +40,7 @@ if ! source $PRETTY_OUTPUT_LIBRARY &>/dev/null
 then
     printf "\n\n\e[31m%s %s\e[0m\n\n" \
         "[!] Couldn't source the pretty output library. Make sure" \
-        "to run bash ./MiniDeb/start_install.sh."
+        "to run bash ./DebianInstaller/start_install.sh."
     exit 1
 fi
 
@@ -48,7 +48,7 @@ if ! source $INSTALLATION_VARIABLES_FILE &>/dev/null
 then
     printf "\n\n\e[31m%s %s\e[0m\n\n" \
         "[!] Couldn't source the installation variable. Make sure" \
-        "to run \`bash ./MiniDeb/start_install.sh\` first"
+        "to run \`bash ./DebianInstaller/start_install.sh\` first"
     exit 1
 fi
 

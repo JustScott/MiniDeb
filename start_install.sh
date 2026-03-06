@@ -26,7 +26,7 @@ root_partition="/dev/vda2"
 
 INSTALLATION_VARIABLES_FILE=/tmp/activate_installation_variables.sh
 
-PRETTY_OUTPUT_LIBRARY=./MiniDeb/pretty_output_library.sh
+PRETTY_OUTPUT_LIBRARY=./DebianInstaller/pretty_output_library.sh
 
 COMPLETION_FILE="start_install_completion.txt"
 
@@ -39,7 +39,7 @@ if ! source $PRETTY_OUTPUT_LIBRARY &>/dev/null
 then
     printf "\n\n\e[31m%s %s\e[0m\n\n" \
         "[!] Couldn't source the pretty output library. Make sure" \
-        "to run \`bash ./MiniDeb/start_install.sh\`"
+        "to run \`bash ./DebianInstaller/start_install.sh\`"
     exit 1
 fi
 
@@ -148,10 +148,10 @@ fi
 
 clear
 
-if ! cmp -s ./MiniDeb/configuration_files/sources.list \
+if ! cmp -s ./DebianInstaller/configuration_files/sources.list \
     /etc/apt/sources.list &>/dev/null
 then
-    cp ./MiniDeb/configuration_files/sources.list /etc/apt/sources.list \
+    cp ./DebianInstaller/configuration_files/sources.list /etc/apt/sources.list \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Copy sources.list to the current live system"
     [[ $? -ne 0 ]] && exit 1
@@ -302,10 +302,11 @@ then
     [[ $? -ne 0 ]] && exit 1
 fi
 
-if ! cmp -s ./MiniDeb/configuration_files/sources.list \
+if ! cmp -s ./DebianInstaller/configuration_files/sources.list \
     /mnt/etc/apt/sources.list &>/dev/null
 then
-    cp ./MiniDeb/configuration_files/sources.list /mnt/etc/apt/sources.list \
+    cp ./DebianInstaller/configuration_files/sources.list \
+        /mnt/etc/apt/sources.list \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Copy sources.list to the new system"
     [[ $? -ne 0 ]] && exit 1
@@ -330,9 +331,9 @@ then
     [[ $? -ne 0 ]] && exit 1
 fi
 
-if ! cmp -s ./MiniDeb/finish_install.sh /mnt/finish_install.sh &>/dev/null
+if ! cmp -s ./DebianInstaller/finish_install.sh /mnt/finish_install.sh &>/dev/null
 then
-    cp ./MiniDeb/finish_install.sh /mnt \
+    cp ./DebianInstaller/finish_install.sh /mnt \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" \
         "Copy 'finish_install.sh' to the new system"
