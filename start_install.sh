@@ -338,13 +338,6 @@ then
     echo "genfstab" >> $COMPLETION_FILE
 fi
 
-if ! cmp -s /etc/hosts /mnt/etc/hosts &>/dev/null
-then
-    cp /etc/hosts /mnt/etc/hosts >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Copy the hosts file to the new system"
-    [[ $? -ne 0 ]] && exit 1
-fi
-
 if ! cmp -s ./DebianInstaller/configuration_files/sources.list \
     /mnt/etc/apt/sources.list &>/dev/null
 then
@@ -357,8 +350,12 @@ fi
 
 if ! grep "^set_hostname$" $COMPLETION_FILE &>/dev/null
 then
-    echo "debian" > /mnt/etc/hostname >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Set the new systems hostname to 'debian'"
+    echo "debian" > /mnt/etc/hostname &
+    task_output $! "$STDERR_LOG_PATH" "Set the hostname to 'debian'"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo -e "127.0.0.1 localhost\n127.0.1.1 debian" > /mnt/etc/hosts &
+    task_output $! "$STDERR_LOG_PATH" "Populate the '/etc/hosts' file"
     [[ $? -ne 0 ]] && exit 1
 
     echo "set_hostname" >> $COMPLETION_FILE

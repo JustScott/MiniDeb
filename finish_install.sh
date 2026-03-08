@@ -76,7 +76,8 @@ then
         $APT_CACHE_FILE &>/dev/null
     then
         echo "Acquire::http::Proxy \"$APT_CACHE_SERVER\";" > $APT_CACHE_FILE &
-        task_output $! "$STDERR_LOG_PATH" "Use apt proxy server '$APT_CACHE_SERVER'"
+        task_output $! "$STDERR_LOG_PATH" \
+            "Use apt proxy server '$APT_CACHE_SERVER'"
         [[ $? -ne 0 ]] && exit 1
     fi
 
