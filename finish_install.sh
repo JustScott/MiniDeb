@@ -112,7 +112,7 @@ then
     task_output $! "$STDERR_LOG_PATH" "Install gnome"
     [[ $? -ne 0 ]] && exit 1
 
-    apt-get install --yes locales \
+    apt-get install --yes locales neovim \
         git efibootmgr efivar linux-image-amd64 \
         grub-efi-amd64-bin network-manager sudo \
         plymouth plymouth-themes \
