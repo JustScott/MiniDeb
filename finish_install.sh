@@ -88,6 +88,11 @@ then
             "happen...stopping"
         exit 1
     fi
+
+    curl "$APT_CACHE_SERVER" &>/dev/null &
+    task_output $! "$STDERR_LOG_PATH" \
+        "Check connection to apt cache server at '$APT_CACHE_SERVER'"
+    [[ $? -ne 0 ]] && exit 1
 fi
 
 if ! grep "^apt_update$" $COMPLETION_FILE &>/dev/null
