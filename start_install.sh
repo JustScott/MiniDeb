@@ -131,6 +131,23 @@ check_required_install_constants()
 
 check_required_install_constants
 
+check_for_cache_server()
+{
+    if [[ -n "$APT_CACHE_SERVER" ]]
+    then
+        if ! curl "$APT_CACHE_SERVER" &>/dev/null
+        then
+            printf "\n\e[31m%s\e[0m\n" \
+                "[!] Couldn't reach the apt caching server at '$APT_CACHE_SERVER'"
+            exit 1
+        fi
+    fi
+
+    return 0
+}
+
+check_for_cache_server
+
 # We should remove the admin_password from the install variables file
 # if set_admin_password isn't in the completion file, because it could
 # mean the user wants to enter a new password
