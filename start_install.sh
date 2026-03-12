@@ -320,7 +320,7 @@ if ! grep "^run_debootstrap$" $COMPLETION_FILE &>/dev/null
 then
     if [[ -n "$APT_CACHE_SERVER" ]]
     then
-        debootstrap --arch amd64 stable /mnt \
+        debootstrap --arch amd64 --include=curl stable /mnt \
             $APT_CACHE_SERVER/deb.debian.org/debian \
             >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
         task_output $! "$STDERR_LOG_PATH" \
