@@ -135,7 +135,7 @@ check_for_cache_server()
 {
     if [[ -n "$APT_CACHE_SERVER" ]]
     then
-        curl "$APT_CACHE_SERVER" &>/dev/null &
+        curl --max-time 5 "$APT_CACHE_SERVER" 1>/dev/null 2>$STDERR_LOG_PATH &
         task_output $! "$STDERR_LOG_PATH" \
             "Check connection to apt cache server at '$APT_CACHE_SERVER'"
         [[ $? -ne 0 ]] && exit 1
