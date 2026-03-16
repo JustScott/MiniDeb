@@ -238,15 +238,6 @@ then
     echo "apt_update" >> $COMPLETION_FILE
 fi
 
-if ! grep "^apt_upgrade$" $COMPLETION_FILE &>/dev/null
-then
-    apt-get upgrade --yes >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "upgrade live system with apt"
-    [[ $? -ne 0 ]] && exit 1
-
-    echo "apt_upgrade" >> $COMPLETION_FILE
-fi
-
 if ! grep "^apt_install_debootstrap$" $COMPLETION_FILE &>/dev/null
 then
     apt-get install --yes arch-install-scripts debootstrap \
