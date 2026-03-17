@@ -120,7 +120,7 @@ then
 
     apt-get install --yes \
         fonts-recommended fonts-noto* \
-        locales neovim curl wget \
+        locales neovim curl wget unattended-upgrades \
         git efibootmgr efivar linux-image-amd64 \
         grub-efi-amd64-bin network-manager sudo \
         plymouth plymouth-themes \
