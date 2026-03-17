@@ -336,6 +336,17 @@ task_output $! "$STDERR_LOG_PATH" "Remove administrator from gdm login screen"
 [[ $? -ne 0 ]] && exit 1
 
 # No need for completion tracking
-systemctl enable NetworkManager >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Enable NetworkManager service"
-[[ $? -ne 0 ]] && exit 1
+if ! systemctl is-enabled NetworkManager &>/dev/null
+then
+    systemctl enable NetworkManager >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Enable NetworkManager service"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+# No need for completion tracking
+if ! systemctl is-enabled unattended-upgrades &>/dev/null
+then
+    systemctl enable unattended-upgrades >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Enable unattended-upgrades service"
+    [[ $? -ne 0 ]] && exit 1
+fi
