@@ -92,7 +92,15 @@ then
     curl --max-time 5 "$APT_CACHE_SERVER" 1>/dev/null 2>$STDERR_LOG_PATH &
     task_output $! "$STDERR_LOG_PATH" \
         "Check connection to apt cache server at '$APT_CACHE_SERVER'"
-    [[ $? -ne 0 ]] && exit 1
+    if [[ $? -ne 0 ]]
+    then
+        printf "\n\e[36m%s %s %s %s\e[0m\n\n" \
+            "[TIP] Change the APT_CACHE_SERVER line in" \
+            "'./DebianInstaller/install_constants' to your new apt cache" \
+            "server url, or remove the line entirely if you aren't using" \
+            "an apt cache server"
+        exit 1
+    fi
 fi
 
 if ! grep "^apt_update$" $COMPLETION_FILE &>/dev/null
