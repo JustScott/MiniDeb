@@ -121,8 +121,18 @@ EOF
 
 if ! grep "^apt_install_system_packages$" $COMPLETION_FILE &>/dev/null
 then
-    apt-get install --no-install-recommends --yes gnome-core \
-        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    apt-get install --no-install-recommends --yes \
+        gdm3 gnome-backgrounds gnome-bluetooth-sendto gnome-control-center \
+        gnome-keyring gnome-menus gnome-session gnome-settings-daemon \
+        gnome-shell orca gnome-sushi tecla adwaita-icon-theme glib-networking \
+        gsettings-desktop-schemas evince gnome-calculator gnome-calendar \
+        gnome-terminal gnome-software gnome-text-editor loupe nautilus \
+        simple-scan gnome-snapshot totem cups evolution-data-server \
+        fonts-cantarell gstreamer1.0-packagekit gstreamer1.0-plugins-base \
+        gstreamer1.0-plugins-good gvfs-backends gvfs-fuse libatk-adaptor \
+        libcanberra-pulse libglib2.0-bin libpam-gnome-keyring pipewire-audio \
+        system-config-printer-common system-config-printer-udev zenity \
+        network-manager >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Install gnome"
     [[ $? -ne 0 ]] && exit 1
 
