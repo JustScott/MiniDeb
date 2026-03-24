@@ -113,23 +113,48 @@ check_required_install_constants()
     then
         printf "\n\e[31m%s\e[0m\n" \
             "[!] \$DISK constant not set, this is fatal...stopping"
-        exit 1
+        return 1
     fi
     if [[ -z "$EFI_PARTITION" ]]
     then
         printf "\n\e[31m%s\e[0m\n" \
             "[!] \$DISK constant not set, this is fatal...stopping"
-        exit 1
+        return 1
     fi
     if [[ -z "$ROOT_PARTITION" ]]
     then
         printf "\n\e[31m%s\e[0m\n" \
             "[!] \$DISK constant not set, this is fatal...stopping"
-        exit 1
+        return 1
     fi
+
+    return 0
 }
 
-check_required_install_constants
+check_required_install_constants || exit 1
+
+check_root_UUID()
+{
+    if [[ -z "$ENCRYPTED_PARTITION_UUID" ]]
+    then
+        printf "\n\n\e[31m%s %s %s\e[0m\n\n" \
+            "[!] Can't find UUID for partition $ROOT_PARTITION. Remember to" \
+            "create a 1GB EFI partition and Linux Filesystem partition with" \
+            "the remaining space before running start_install.sh"
+        return 1
+    fi
+
+    if ! blkid | grep "$ENCRYPTED_PARTITION_UUID" &>/dev/null
+    then
+        printf "\n\n\e[31m%s %s %s\e[0m\n\n" \
+            "[!] '$ROOT_PARTITION' UUID not found in blkid output. Remember" \
+            "to create a 1GB EFI partition and Linux Filesystem partition" \
+            "with the remaining space before running start_install.sh"
+        return 1
+    fi
+
+    return 0
+}
 
 check_for_cache_server()
 {
@@ -145,14 +170,14 @@ check_for_cache_server()
                 "'./DebianInstaller/install_constants' to your new apt cache" \
                 "server url, or remove the line entirely if you aren't using" \
                 "an apt cache server"
-            exit 1
+            return 1
         fi
     fi
 
     return 0
 }
 
-check_for_cache_server
+check_for_cache_server || exit 1
 
 # We should remove the admin_password from the install variables file
 # if set_admin_password isn't in the completion file, because it could
@@ -195,6 +220,43 @@ then
     echo -e "\nusername=\"$name\"" >> $INSTALLATION_VARIABLES_FILE
 
     echo "set_username" >> $COMPLETION_FILE
+fi
+
+if ! grep "^luksFormat$" $COMPLETION_FILE &>/dev/null
+then
+    dd if=/dev/urandom of=/crypto_keyfile.bin bs=1024 count=2 &>/dev/null
+
+    cryptsetup luksFormat --type luks1 --key-file /crypto_keyfile.bin \
+        --batch-mode --verify-passphrase $ROOT_PARTITION
+    if [[ $? -ne 0 ]]
+    then
+        printf "\n\n\e[31m%s\e[0m\n\n" \
+            "[!] Failed to luksFormat '$ROOT_PARTITION'"
+        exit 1
+    fi
+
+    cryptsetup luksAddKey --key-file /crypto_keyfile.bin $ROOT_PARTITION
+    if [[ $? -ne 0 ]]
+    then
+        printf "\n\n\e[31m%s\e[0m\n\n" \
+            "[!] Failed to luksFormat '$ROOT_PARTITION'"
+        exit 1
+    fi
+
+    echo "luksFormat" >> $COMPLETION_FILE
+fi
+
+if ! grep "^luksOpen$" $COMPLETION_FILE &>/dev/null
+then
+    cryptsetup open --key-file /crypto_keyfile.bin $ROOT_PARTITION cryptdisk
+    if [[ $? -ne 0 ]]
+    then
+        printf "\n\n\e[31m%s\e[0m\n\n" \
+            "[!] Failed to open luksEncrypted partition to '/dev/mapper/cryptdisk'"
+        exit 1
+    fi
+
+    echo "luksOpen" >> $COMPLETION_FILE
 fi
 
 clear
@@ -269,7 +331,7 @@ fi
 
 if ! grep "^mkfs_root$" $COMPLETION_FILE &>/dev/null
 then
-    echo 'y' | mkfs.ext4 $ROOT_PARTITION \
+    echo 'y' | mkfs.ext4 /dev/mapper/cryptdisk \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Format root partition with EXT4"
     [[ $? -ne 0 ]] && exit 1
@@ -279,12 +341,16 @@ fi
 
 if ! grep "^mount_root$" $COMPLETION_FILE &>/dev/null
 then
-    mount $ROOT_PARTITION /mnt >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    mount /dev/mapper/cryptdisk /mnt >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Mount the root partition"
     [[ $? -ne 0 ]] && exit 1
 
     echo "mount_root" >> $COMPLETION_FILE
 fi
+
+cp /crypto_keyfile.bin /mnt/
+
+chmod 600 /mnt/crypto_keyfile.bin
 
 if ! grep "^mount_boot$" $COMPLETION_FILE &>/dev/null
 then
@@ -352,6 +418,25 @@ then
     echo "genfstab" >> $COMPLETION_FILE
 fi
 
+ENCRYPTED_PARTITION_UUID="$(blkid -s UUID -o value $ROOT_PARTITION)"
+
+check_root_UUID || exit 1
+
+if ! grep "$ENCRYPTED_PARTITION_UUID" /mnt/etc/crypttab &>/dev/null
+then
+    if ! [[ -d /mnt/etc/ ]]
+    then
+        mkdir -p /mnt/etc 1>/dev/null 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" "Create /mnt/etc for crypttab"
+        [[ $? -ne 0 ]] && exit 1
+    fi
+
+    echo "cryptdisk UUID=$ENCRYPTED_PARTITION_UUID /crypto_keyfile.bin luks,discard,keyscript=/bin/cat" \
+        > /mnt/etc/crypttab 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Populate /mnt/etc/crypttab"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
 if ! cmp -s ./DebianInstaller/configuration_files/sources.list \
     /mnt/etc/apt/sources.list &>/dev/null
 then
@@ -403,7 +488,6 @@ then
         "Copy '$INSTALLATION_VARIABLES_FILE' to the new system"
     [[ $? -ne 0 ]] && exit 1
 fi
-
 
 if ! cmp -s $INSTALL_CONSTANTS_FILE \
     /mnt/$(basename $INSTALL_CONSTANTS_FILE) &>/dev/null

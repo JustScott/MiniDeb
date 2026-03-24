@@ -138,8 +138,8 @@ then
 
     apt-get install --yes \
         fonts-recommended fonts-noto* \
-        locales neovim curl wget unattended-upgrades \
-        git efibootmgr efivar linux-image-amd64 \
+        locales neovim curl wget git unattended-upgrades \
+        efibootmgr efivar linux-image-amd64 cryptsetup cryptsetup-initramfs \
         grub-efi-amd64-bin network-manager wpasupplicant sudo \
         plymouth plymouth-themes \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
@@ -187,12 +187,30 @@ then
         [[ $? -ne 0 ]] && exit 1
     fi
 
+    LUKS_DEVICE_UUID="$(blkid -s UUID -o value $ROOT_PARTITION)"
+
+    if [[ -z "$LUKS_DEVICE_UUID" ]]
+    then
+        printf "\n\e[31m%s\e[0m\n" \
+            "[!] Cannot get the UUID of '$ROOT_PARTITION'." \
+            "This is fatal... stopping"
+        exit 1
+    fi
+
     if ! grep "^GRUB_CMDLINE_LINUX_DEFAULT" /etc/default/grub &>/dev/null
     then
-        echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"' >> /etc/default/grub
+        echo "GRUB_CMDLINE_LINUX_DEFAULT='quiet cryptdevice=UUID=$LUKS_DEVICE_UUID:cryptdisk root=/dev/mapper/cryptdisk splash'" >> /etc/default/grub
     else
         sed -i \
-            '/^GRUB_CMDLINE_LINUX_DEFAULT/c\GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"' /etc/default/grub
+            "/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX='quiet cryptdevice=UUID=$LUKS_DEVICE_UUID:cryptdisk root=/dev/mapper/cryptdisk splash'" /etc/default/grub
+    fi
+
+    if ! grep "^GRUB_ENABLE_CRYPTODISK" /etc/default/grub &>/dev/null
+    then
+        echo 'GRUB_ENABLE_CRYPTODISK=y' >> /etc/default/grub
+    else
+        sed -i \
+            '/^GRUB_ENABLE_CRYPTODISK=/c\GRUB_ENABLE_CRYPTODISK=y' /etc/default/grub
     fi
 
     if ! grep "^GRUB_GFXMODE" /etc/default/grub &>/dev/null
@@ -225,7 +243,7 @@ fi
 if ! grep "^grub_install$" $COMPLETION_FILE &>/dev/null
 then
     grub-install --target=x86_64-efi --efi-directory=/boot/efi \
-        --bootloader-id=Debian $DISK \
+        --bootloader-id=debian --recheck $DISK \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Install grub"
     [[ $? -ne 0 ]] && exit 1
@@ -233,19 +251,18 @@ then
     echo "grub_install" >> $COMPLETION_FILE
 fi
 
-if ! grep "^grub_mkconfig$" $COMPLETION_FILE &>/dev/null
+if ! grep "^grub_update$" $COMPLETION_FILE &>/dev/null
 then
-    grub-mkconfig -o /boot/grub/grub.cfg \
-        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    update-grub >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Apply Grub configuration"
     [[ $? -ne 0 ]] && exit 1
 
-    echo "grub_mkconfig" >> $COMPLETION_FILE
+    echo "grub_update" >> $COMPLETION_FILE
 fi
 
 if ! grep "^update_initramfs$" $COMPLETION_FILE &>/dev/null
 then
-    update-initramfs -u >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    update-initramfs -u -k all >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Update the initramfs"
     [[ $? -ne 0 ]] && exit 1
 
