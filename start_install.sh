@@ -271,7 +271,7 @@ if ! grep "^mkfs_root$" $COMPLETION_FILE &>/dev/null
 then
     echo 'y' | mkfs.ext4 $ROOT_PARTITION \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Configure System For EXT4"
+    task_output $! "$STDERR_LOG_PATH" "Format root partition with EXT4"
     [[ $? -ne 0 ]] && exit 1
 
     echo "mkfs_root" >> $COMPLETION_FILE
