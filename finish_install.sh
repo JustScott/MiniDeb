@@ -140,7 +140,7 @@ then
         fonts-recommended fonts-noto* \
         locales neovim curl wget unattended-upgrades \
         git efibootmgr efivar linux-image-amd64 \
-        grub-efi-amd64-bin network-manager sudo \
+        grub-efi-amd64-bin network-manager wpasupplicant sudo \
         plymouth plymouth-themes \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Install system packages"
