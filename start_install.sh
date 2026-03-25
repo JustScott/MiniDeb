@@ -133,6 +133,12 @@ check_required_install_constants()
             "[!] \$ROOT_PARTITION constant not set, this is fatal...stopping"
         return 1
     fi
+    if [[ -z "$KEYFILE_PARTITION" ]]
+    then
+        printf "\n\e[31m%s\e[0m\n" \
+            "[!] \$KEYFILE_PARTITION constant not set, this is fatal...stopping"
+        return 1
+    fi
 
     return 0
 }
@@ -228,33 +234,55 @@ then
     echo "set_username" >> $COMPLETION_FILE
 fi
 
+if ! [[ -b /dev/disk/by-label/keyfile_usb ]]
+then
+    echo 'y' | mkfs.fat -F 32 -n "keyfile_usb" $KEYFILE_PARTITION \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Format keyfile_usb partition with FAT32"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+if ! [[ -d /media/keyfile_usb ]]
+then
+    mount --mkdir /dev/disk/by-label/keyfile_usb /media/keyfile_usb \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Mount keyfile_usb partition"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+if ! [[ -f /media/keyfile_usb/luks_keyfile ]]
+then
+    dd if=/dev/urandom of=/media/keyfile_usb/luks_keyfile bs=1024 count=2 \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Create luks_keyfile on keyfile_usb"
+    [[ $? -ne 0 ]] && exit 1
+
+    chmod 400 /media/keyfile_usb/luks_keyfile \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Set permissions on luks_keyfile (600)"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
 if ! grep "^luksFormat$" $COMPLETION_FILE &>/dev/null
 then
-    cryptsetup luksFormat --batch-mode --verify-passphrase $ROOT_PARTITION
-    if [[ $? -ne 0 ]]
-    then
-        printf "\n\n\e[31m%s\e[0m\n\n" \
-            "[!] Failed to luksFormat '$ROOT_PARTITION'"
-        exit 1
-    fi
+    cryptsetup luksFormat --key-file /media/keyfile_usb/luks_keyfile \
+        --batch-mode $ROOT_PARTITION \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "luksFormat $ROOT_PARTITION with USB keyfile"
+    [[ $? -ne 0 ]] && exit 1
 
     echo "luksFormat" >> $COMPLETION_FILE
 fi
 
 if ! grep "^luksOpen$" $COMPLETION_FILE &>/dev/null
 then
-    cryptsetup open $ROOT_PARTITION cryptdisk
-    if [[ $? -ne 0 ]]
-    then
-        printf "\n\n\e[31m%s\e[0m\n\n" \
-            "[!] Failed to open luksEncrypted partition to '/dev/mapper/cryptdisk'"
-        exit 1
-    fi
+    cryptsetup open --key-file /media/keyfile_usb/luks_keyfile \
+        $ROOT_PARTITION cryptdisk >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "open luks encrypted root partition"
+    [[ $? -ne 0 ]] && exit 1
 
     echo "luksOpen" >> $COMPLETION_FILE
 fi
-
-clear
 
 if ! cmp -s ./DebianInstaller/configuration_files/sources.list \
     /etc/apt/sources.list &>/dev/null
@@ -442,7 +470,7 @@ then
         [[ $? -ne 0 ]] && exit 1
     fi
 
-    echo "cryptdisk UUID=$ENCRYPTED_PARTITION_UUID none luks,discard" \
+    echo "cryptdisk UUID=$ENCRYPTED_PARTITION_UUID /dev/disk/by-label/keyfile_usb:/luks_keyfile:20 luks,discard,keyscript=/lib/cryptsetup/scripts/passdev,tries=1" \
         > /mnt/etc/crypttab 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Populate /mnt/etc/crypttab"
     [[ $? -ne 0 ]] && exit 1

@@ -14,7 +14,10 @@ sudo -i # become root now for running later commands
 cfdisk /dev/disk
 ```
 
-Second, ensure you are connected to Ethernet or WiFi. Then clone the repository 
+Second, create a 1GB partition on your USB stick
+  * Then add it to the value of `KEYFILE_PARTITION` in `install_constants` 
+
+Third, ensure you are connected to Ethernet or WiFi. Then clone the repository 
 and run `start_install.sh`:
 
 ```bash

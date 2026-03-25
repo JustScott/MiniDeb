@@ -26,6 +26,19 @@ COMPLETION_FILE="/finish_install_completion.txt"
 
 export DEBIAN_FRONTEND=noninteractive
 
+add_initramfs_module()
+{
+    if ! [[ -d /etc/initramfs-tools ]]
+    then
+        mkdir -p /etc/initramfs-tools
+    fi
+
+    if ! grep "$1" /etc/initramfs-tools/modules &>/dev/null
+    then
+        echo "$1" >> /etc/initramfs-tools/modules
+    fi
+}
+
 if [[ "$(whoami)" != "root" ]]
 then
     printf "\n\e[31m%s\e[0m\n" "[!] Must run script as root"
@@ -176,6 +189,17 @@ then
 
     echo "generate_locale" >> $COMPLETION_FILE
 fi
+
+{
+    add_initramfs_module "usb_storage"
+    add_initramfs_module "usbhid"
+    add_initramfs_module "hid_generic"
+    add_initramfs_module "nls_cp437"
+    add_initramfs_module "nls_utf8"
+    add_initramfs_module "nls_ascii"
+} >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+task_output $! "$STDERR_LOG_PATH" "Add modules to initramfs for USB decryption"
+[[ $? -ne 0 ]] && exit 1
 
 if ! grep "^configure_grub$" $COMPLETION_FILE &>/dev/null
 then
