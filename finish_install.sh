@@ -205,14 +205,6 @@ then
             "/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX='quiet cryptdevice=UUID=$LUKS_DEVICE_UUID:cryptdisk root=/dev/mapper/cryptdisk splash'" /etc/default/grub
     fi
 
-    if ! grep "^GRUB_ENABLE_CRYPTODISK" /etc/default/grub &>/dev/null
-    then
-        echo 'GRUB_ENABLE_CRYPTODISK=y' >> /etc/default/grub
-    else
-        sed -i \
-            '/^GRUB_ENABLE_CRYPTODISK=/c\GRUB_ENABLE_CRYPTODISK=y' /etc/default/grub
-    fi
-
     if ! grep "^GRUB_GFXMODE" /etc/default/grub &>/dev/null
     then
         echo 'GRUB_GFXMODE=1920x1080' >> /etc/default/grub

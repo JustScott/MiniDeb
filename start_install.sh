@@ -118,13 +118,19 @@ check_required_install_constants()
     if [[ -z "$EFI_PARTITION" ]]
     then
         printf "\n\e[31m%s\e[0m\n" \
-            "[!] \$DISK constant not set, this is fatal...stopping"
+            "[!] \$EFI_PARTITION constant not set, this is fatal...stopping"
+        return 1
+    fi
+    if [[ -z "$BOOT_PARTITION" ]]
+    then
+        printf "\n\e[31m%s\e[0m\n" \
+            "[!] \$BOOT_PARTITION constant not set, this is fatal...stopping"
         return 1
     fi
     if [[ -z "$ROOT_PARTITION" ]]
     then
         printf "\n\e[31m%s\e[0m\n" \
-            "[!] \$DISK constant not set, this is fatal...stopping"
+            "[!] \$ROOT_PARTITION constant not set, this is fatal...stopping"
         return 1
     fi
 
@@ -224,18 +230,7 @@ fi
 
 if ! grep "^luksFormat$" $COMPLETION_FILE &>/dev/null
 then
-    dd if=/dev/urandom of=/crypto_keyfile.bin bs=1024 count=2 &>/dev/null
-
-    cryptsetup luksFormat --type luks1 --key-file /crypto_keyfile.bin \
-        --batch-mode --verify-passphrase $ROOT_PARTITION
-    if [[ $? -ne 0 ]]
-    then
-        printf "\n\n\e[31m%s\e[0m\n\n" \
-            "[!] Failed to luksFormat '$ROOT_PARTITION'"
-        exit 1
-    fi
-
-    cryptsetup luksAddKey --key-file /crypto_keyfile.bin $ROOT_PARTITION
+    cryptsetup luksFormat --batch-mode --verify-passphrase $ROOT_PARTITION
     if [[ $? -ne 0 ]]
     then
         printf "\n\n\e[31m%s\e[0m\n\n" \
@@ -248,7 +243,7 @@ fi
 
 if ! grep "^luksOpen$" $COMPLETION_FILE &>/dev/null
 then
-    cryptsetup open --key-file /crypto_keyfile.bin $ROOT_PARTITION cryptdisk
+    cryptsetup open $ROOT_PARTITION cryptdisk
     if [[ $? -ne 0 ]]
     then
         printf "\n\n\e[31m%s\e[0m\n\n" \
@@ -319,11 +314,21 @@ then
     echo "apt_install_debootstrap" >> $COMPLETION_FILE
 fi
 
-if ! grep "^mkfs_boot$" $COMPLETION_FILE &>/dev/null
+if ! grep "^mkfs_efi$" $COMPLETION_FILE &>/dev/null
 then
     echo 'y' | mkfs.fat -F 32 $EFI_PARTITION \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Format boot partition with FAT32"
+    task_output $! "$STDERR_LOG_PATH" "Format EFI partition with FAT32"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "mkfs_efi" >> $COMPLETION_FILE
+fi
+
+if ! grep "^mkfs_boot$" $COMPLETION_FILE &>/dev/null
+then
+    echo 'y' | mkfs.ext4 $BOOT_PARTITION \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Format boot partition with ext4"
     [[ $? -ne 0 ]] && exit 1
 
     echo "mkfs_boot" >> $COMPLETION_FILE
@@ -348,18 +353,24 @@ then
     echo "mount_root" >> $COMPLETION_FILE
 fi
 
-cp /crypto_keyfile.bin /mnt/
-
-chmod 600 /mnt/crypto_keyfile.bin
-
 if ! grep "^mount_boot$" $COMPLETION_FILE &>/dev/null
 then
-    mount --mkdir $EFI_PARTITION /mnt/boot/efi \
+    mount --mkdir $BOOT_PARTITION /mnt/boot \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Mount the boot partition"
     [[ $? -ne 0 ]] && exit 1
 
     echo "mount_boot" >> $COMPLETION_FILE
+fi
+
+if ! grep "^mount_efi$" $COMPLETION_FILE &>/dev/null
+then
+    mount --mkdir $EFI_PARTITION /mnt/boot/efi \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Mount the efi partition"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "mount_efi" >> $COMPLETION_FILE
 fi
 
 if ! grep "^mkswap$" $COMPLETION_FILE &>/dev/null
@@ -431,7 +442,7 @@ then
         [[ $? -ne 0 ]] && exit 1
     fi
 
-    echo "cryptdisk UUID=$ENCRYPTED_PARTITION_UUID /crypto_keyfile.bin luks,discard,keyscript=/bin/cat" \
+    echo "cryptdisk UUID=$ENCRYPTED_PARTITION_UUID none luks,discard" \
         > /mnt/etc/crypttab 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Populate /mnt/etc/crypttab"
     [[ $? -ne 0 ]] && exit 1

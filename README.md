@@ -4,14 +4,24 @@ Scripts to setup a minimal, opinionated, Gnome-based Debian Linux system.
 
 ## Usage
 
-First, ensure you are connected to Ethernet or WiFi. Then clone the repository 
+First, create 3 partitions:
+  * 1GB EFI partition
+  * 1GB boot partition
+  * root partition with the remaining disk space
+
+```bash
+sudo -i # become root now for running later commands
+cfdisk /dev/disk
+```
+
+Second, ensure you are connected to Ethernet or WiFi. Then clone the repository 
 and run `start_install.sh`:
 
 ```bash
 apt update
 apt install git
 git clone https://www.github.com/JustScott/DebianInstaller
-bash ./DebianInstaller/start_install.sh
+bash ./DebianInstaller/start_install.sh # run as root
 ```
 
 ### Script Completion Handling
