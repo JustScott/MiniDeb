@@ -342,7 +342,8 @@ fi
 if [[ -d "/home/administrator" ]]
 then
     cd /home/administrator
-    git clone https://www.github.com/JustScott/DebianPreset &>/dev/null
+    git clone https://www.github.com/JustScott/DebianPreset \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" \
         "Clone DebianPreset to administrator's \$HOME"
     if [[ -d /home/administrator/DebianPreset ]]
@@ -359,7 +360,8 @@ fi
 if [[ -d "/home/$username" ]]
 then
     cd /home/$username
-    git clone https://www.github.com/JustScott/DebianPreset &>/dev/null
+    git clone https://www.github.com/JustScott/DebianPreset \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" \
         "Clone DebianPreset to $username's \$HOME"
     if [[ -d /home/$username/DebianPreset ]]
