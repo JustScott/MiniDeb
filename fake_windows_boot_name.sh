@@ -18,4 +18,6 @@
 # Sometimes motherboard creators only allow booting from partition with 
 # the label "Windows Boot Manager"
 
-sudo efibootmgr -c -L "Windows Boot Manager" -l "\EFI\Debian\grubx64.efi"
+#sudo efibootmgr -c -L "Windows Boot Manager" -l "\EFI\Debian\grubx64.efi"
+sudo mkdir -p /boot/efi/EFI/BOOT
+sudo cp /boot/efi/EFI/debian/grubx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
