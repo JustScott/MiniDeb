@@ -223,10 +223,10 @@ then
 
     if ! grep "^GRUB_CMDLINE_LINUX_DEFAULT" /etc/default/grub &>/dev/null
     then
-        echo "GRUB_CMDLINE_LINUX_DEFAULT='quiet cryptdevice=UUID=$LUKS_DEVICE_UUID:cryptdisk root=/dev/mapper/cryptdisk splash'" >> /etc/default/grub
+        echo "GRUB_CMDLINE_LINUX_DEFAULT='quiet splash'" >> /etc/default/grub
     else
         sed -i \
-            "/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX='quiet cryptdevice=UUID=$LUKS_DEVICE_UUID:cryptdisk root=/dev/mapper/cryptdisk splash'" /etc/default/grub
+            "/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX='quiet splash'" /etc/default/grub
     fi
 
     if ! grep "^GRUB_GFXMODE" /etc/default/grub &>/dev/null
