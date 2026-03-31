@@ -145,7 +145,7 @@ then
         gstreamer1.0-plugins-good gvfs-backends gvfs-fuse libatk-adaptor \
         libcanberra-pulse libglib2.0-bin libpam-gnome-keyring pipewire-audio \
         system-config-printer-common system-config-printer-udev zenity \
-        network-manager >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        network-manager gir1.2-gnomedesktop-3.0 >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Install gnome"
     [[ $? -ne 0 ]] && exit 1
 
