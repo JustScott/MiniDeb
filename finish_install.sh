@@ -152,7 +152,8 @@ then
     apt-get install --yes \
         fonts-recommended fonts-noto* \
         locales neovim curl wget git unattended-upgrades \
-        efibootmgr efivar linux-image-amd64 cryptsetup cryptsetup-initramfs \
+        linux-image-amd64 firmware-amd-graphics mesa-vulkan-drivers \
+        cryptsetup cryptsetup-initramfs efibootmgr efivar \
         grub-efi-amd64-bin network-manager wpasupplicant sudo \
         plymouth plymouth-themes \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
