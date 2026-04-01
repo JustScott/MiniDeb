@@ -154,8 +154,8 @@ then
         locales neovim curl wget git unattended-upgrades \
         linux-image-amd64 firmware-amd-graphics mesa-vulkan-drivers \
         cryptsetup cryptsetup-initramfs efibootmgr efivar \
-        grub-efi-amd64-bin network-manager wpasupplicant sudo \
-        plymouth plymouth-themes \
+        grub-efi-amd64-bin plymouth plymouth-themes sudo \
+        firmware-realtek network-manager wpasupplicant \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Install system packages"
     [[ $? -ne 0 ]] && exit 1
