@@ -141,9 +141,21 @@ then
     task_output $! "$STDERR_LOG_PATH" "Install isenkram-cli"
     [[ $? -ne 0 ]] && exit 1
 
-    isenkram-autoinstall-firmware >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Auto-install firmware with isenkram"
-    [[ $? -ne 0 ]] && exit 1
+    # Can't just use task_output because for some reason isenkram returns 1
+    # if there's no firmware to install, which isn't an error.
+    printf "\r\e[36m[%s]\e[0m %s" "..." "Auto-install firmware with isenkram"
+    isenkram-autoinstall-firmware >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH"
+    exit_code=$?
+    if [[ $exit_code -lt 2 ]]
+    then
+        printf "\r\e[32m[Success]\e[0m %s\n" "Auto-install firmware with isenkram"
+    elif [[ $exit_code -gt 1 ]]
+    then
+        printf "\r\e[31m[Error]\e[0m %s (Exit code: %d)\n" "$task_message" "$exit_code"
+        printf "\e[31m[!] Check error log: %s\e[0m\n" "$stderr_path"
+        exit 1
+    fi
+    unset exit_code
 
     apt-get purge --yes isenkram-cli \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
