@@ -345,13 +345,17 @@ then
     echo "update_initramfs" >> $COMPLETION_FILE
 fi
 
-if ! grep "^set_splash_theme$" $COMPLETION_FILE &>/dev/null
+if dpkg -s plymouth &>/dev/null
 then
-    plymouth-set-default-theme -R moonlight \
-        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Set the splash theme with plymouth-themes"
+    if ! grep "^set_splash_theme$" $COMPLETION_FILE &>/dev/null
+    then
+        plymouth-set-default-theme -R moonlight \
+            >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" \
+            "Set the splash theme with plymouth-themes"
 
-    echo "set_splash_theme" >> $COMPLETION_FILE
+        echo "set_splash_theme" >> $COMPLETION_FILE
+    fi
 fi
 
 if ! id administrator &>/dev/null
@@ -402,12 +406,14 @@ fi
 
 if [[ -d "/home/administrator" ]]
 then
-    cd /home/administrator
-    git clone https://www.github.com/JustScott/DebianPreset \
-        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" \
-        "Clone DebianPreset to administrator's \$HOME"
-    if [[ -d /home/administrator/DebianPreset ]]
+    if ! [[ -d /home/administrator/DebianPreset ]]
+    then
+        cd /home/administrator
+        git clone https://www.github.com/JustScott/DebianPreset \
+            >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" \
+            "Clone DebianPreset to administrator's \$HOME"
+    elif [[ -d /home/administrator/DebianPreset ]]
     then
         chown administrator:administrator -R /home/administrator/DebianPreset
     fi
@@ -420,12 +426,14 @@ fi
 
 if [[ -d "/home/$username" ]]
 then
-    cd /home/$username
-    git clone https://www.github.com/JustScott/DebianPreset \
-        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" \
-        "Clone DebianPreset to $username's \$HOME"
-    if [[ -d /home/$username/DebianPreset ]]
+    if ! [[ -d /home/$username/DebianPreset ]]
+    then
+        cd /home/$username
+        git clone https://www.github.com/JustScott/DebianPreset \
+            >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" \
+            "Clone DebianPreset to $username's \$HOME"
+    elif [[ -d /home/$username/DebianPreset ]]
     then
         chown $username:$username -R /home/$username/DebianPreset
     fi
@@ -443,11 +451,14 @@ passwd -d $username >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
 task_output $! "$STDERR_LOG_PATH" "Make user account passwordless"
 [[ $? -ne 0 ]] && exit 1
 
-# No need for completion tracking
-echo -e "[User]\nSystemAccount=true" \
-    > /var/lib/AccountsService/users/administrator &
-task_output $! "$STDERR_LOG_PATH" "Remove administrator from gdm login screen"
-[[ $? -ne 0 ]] && exit 1
+if dpkg -s gdm3 &>dev/null
+then
+    # No need for completion tracking
+    echo -e "[User]\nSystemAccount=true" \
+        > /var/lib/AccountsService/users/administrator &
+    task_output $! "$STDERR_LOG_PATH" "Remove administrator from gdm login screen"
+    [[ $? -ne 0 ]] && exit 1
+fi
 
 # No need for completion tracking
 if ! systemctl is-enabled NetworkManager &>/dev/null
