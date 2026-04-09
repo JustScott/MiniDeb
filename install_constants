@@ -5,5 +5,9 @@ ROOT_PARTITION="/dev/vda3"
 
 KEYFILE_PARTITION=""
 
+# Leave empty or comment out for a headless install
+#  - Supported values: 'gnome'
+declare -r DESKTOP_ENVIRONMENT='gnome'
+
 APT_CACHE_SERVER="http://192.168.8.190:3142/"
 APT_CACHE_FILE="/etc/apt/apt.conf.d/10proxy"

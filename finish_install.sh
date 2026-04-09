@@ -132,36 +132,80 @@ keyboard-configuration keyboard-configuration/variantcode string
 console-setup console-setup/charmap47 select UTF-8
 EOF
 
-if ! grep "^apt_install_system_packages$" $COMPLETION_FILE &>/dev/null
+if ! grep "^install_firmware$" $COMPLETION_FILE &>/dev/null
 then
-    apt-get install --no-install-recommends --yes \
-        gdm3 gnome-backgrounds gnome-bluetooth-sendto gnome-control-center \
-        gnome-keyring gnome-menus gnome-session gnome-settings-daemon \
-        gnome-shell orca gnome-sushi tecla adwaita-icon-theme glib-networking \
-        gsettings-desktop-schemas evince gnome-calculator gnome-calendar \
-        gnome-terminal gnome-software gnome-text-editor loupe nautilus \
-        simple-scan gnome-snapshot totem cups evolution-data-server \
-        fonts-cantarell gstreamer1.0-packagekit gstreamer1.0-plugins-base \
-        gstreamer1.0-plugins-good gvfs-backends gvfs-fuse libatk-adaptor \
-        libcanberra-pulse libglib2.0-bin libpam-gnome-keyring pipewire-audio \
-        system-config-printer-common system-config-printer-udev zenity \
-        network-manager gir1.2-gnomedesktop-3.0 power-profiles-daemon \
+    apt-get install --yes isenkram-cli \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Install gnome"
+    task_output $! "$STDERR_LOG_PATH" "Install isenkram-cli"
     [[ $? -ne 0 ]] && exit 1
 
+    isenkram-autoinstall-firmware >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Auto-install firmware with isenkram"
+    [[ $? -ne 0 ]] && exit 1
+
+    apt-get purge --yes isenkram-cli \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Remove isenkram-cli"
+    [[ $? -ne 0 ]] && exit 1
+    echo "install_firmware" >> $COMPLETION_FILE
+fi
+
+if [[ -n "$DESKTOP_ENVIRONMENT" ]]
+then
+    if ! grep "^install_desktop_environment$" $COMPLETION_FILE &>/dev/null
+    then
+        case "$DESKTOP_ENVIRONMENT" in
+            "gnome")
+                apt-get install --no-install-recommends --yes \
+                    gdm3 gnome-backgrounds gnome-bluetooth-sendto \
+                    gnome-control-center gnome-keyring gnome-menus \
+                    gnome-session gnome-settings-daemon gnome-shell \
+                    orca gnome-sushi  adwaita-icon-theme glib-networking \
+                    gsettings-desktop-schemas evince gnome-calculator \
+                    gnome-calendar gnome-terminal gnome-software \
+                    gnome-text-editor gnome-snapshot tecla loupe nautilus \
+                    totem simple-scan zenity evolution-data-server \
+                    fonts-cantarell gstreamer1.0-packagekit \
+                    gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+                    gvfs-backends gvfs-fuse libatk-adaptor libcanberra-pulse \
+                    libglib2.0-bin libpam-gnome-keyring gir1.2-gnomedesktop-3.0 \
+                    >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+                task_output $! "$STDERR_LOG_PATH" "Install gnome"
+                [[ $? -ne 0 ]] && exit 1
+                ;;
+            *)
+                printf "\n\n\e[31m%s\e\n\n" \
+                    "[!] Unsupported desktop environment: '$DESKTOP_ENVIRONMENT'"
+                exit 1
+                ;;
+        esac
+
+        apt-get install --yes \
+            fonts-recommended fonts-noto* \
+            plymouth plymouth-themes \
+            mesa-vulkan-drivers \
+            system-config-printer-common system-config-printer-udev cups \
+            power-profiles-daemon pipewire-audio \
+            >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" \
+            "Install desktop environment helper packages (fonts, pipewire, etc)"
+        [[ $? -ne 0 ]] && exit 1
+        echo "install_desktop_environment" >> $COMPLETION_FILE
+    fi
+fi
+
+if ! grep "^install_general_system_packages$" $COMPLETION_FILE &>/dev/null
+then
     apt-get install --yes \
-        fonts-recommended fonts-noto* \
-        locales neovim curl wget git unattended-upgrades \
-        linux-image-amd64 firmware-amd-graphics mesa-vulkan-drivers \
-        cryptsetup cryptsetup-initramfs efibootmgr efivar \
-        grub-efi-amd64-bin plymouth plymouth-themes sudo \
-        firmware-realtek network-manager wpasupplicant \
+        locales neovim curl wget git unattended-upgrades sudo \
+        linux-image-amd64 grub-efi-amd64-bin \
+        cryptsetup cryptsetup-initramfs \
+        efibootmgr efivar \
+        network-manager wpasupplicant \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Install system packages"
+    task_output $! "$STDERR_LOG_PATH" "Install general system packages"
     [[ $? -ne 0 ]] && exit 1
-
-    echo "apt_install_system_packages" >> $COMPLETION_FILE
+    echo "install_general_system_packages" >> $COMPLETION_FILE
 fi
 
 # TODO: Implement checks for locale and timezone to see if they've been set
@@ -325,6 +369,7 @@ echo administrator:"$admin_password" | chpasswd \
 task_output $! "$STDERR_LOG_PATH" "Set administrator password"
 [[ $? -ne 0 ]] && exit 1
 
+# TODO: Don't create a new home if it already exists
 if ! id $username &>/dev/null
 then
     useradd -Um -s /bin/bash $username  \
