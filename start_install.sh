@@ -185,7 +185,7 @@ fi
 if ! grep "^admin_password=" $INSTALLATION_VARIABLES_FILE &>/dev/null
 then
     clear 
-    echo -e "* Prompt [1/2] *\n"
+    echo -e "* Prompt [1/3] *\n"
     get_user_password "administrator"
     if [[ -z "$user_password" ]]
     then
@@ -205,7 +205,7 @@ fi
 if ! grep "^username=" $INSTALLATION_VARIABLES_FILE &>/dev/null
 then
     clear
-    echo -e "* Prompt [2/2] *\n"
+    echo -e "* Prompt [2/3] *\n"
     echo ' - Set User Name - '
     get_name
     if [[ -z "$name" ]]
@@ -217,6 +217,24 @@ then
 
     echo "set_username" >> $COMPLETION_FILE
 fi
+
+if ! grep "^set_user_password$" $COMPLETION_FILE &>/dev/null
+then
+    sed -i '/^user_password=/d' $INSTALLATION_VARIABLES_FILE
+fi
+if ! grep "^user_password=" $INSTALLATION_VARIABLES_FILE &>/dev/null
+then
+    clear
+    echo -e "* Prompt [3/3] *\n"
+    get_user_password "$name"
+
+    echo -e "\nuser_password=\"$user_password\"" >> $INSTALLATION_VARIABLES_FILE
+
+    echo "set_user_password" >> $COMPLETION_FILE
+fi
+
+unset name
+unset user_password
 
 if ! [[ -b /dev/disk/by-label/keyfile_usb ]]
 then

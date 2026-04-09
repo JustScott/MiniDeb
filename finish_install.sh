@@ -468,10 +468,18 @@ fi
 
 cd /
 
-# No need for completion tracking
-passwd -d $username >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-task_output $! "$STDERR_LOG_PATH" "Make user account passwordless"
-[[ $? -ne 0 ]] && exit 1
+if [[ -n "$user_password" ]]
+then
+    echo "$username":"$user_password" | chpasswd \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Set ${username}'s password"
+    [[ $? -ne 0 ]] && exit 1
+else
+    # No need for completion tracking
+    passwd -d "$username" >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Make ${username}'s account passwordless"
+    [[ $? -ne 0 ]] && exit 1
+fi
 
 if dpkg -s gdm3 &>dev/null
 then
