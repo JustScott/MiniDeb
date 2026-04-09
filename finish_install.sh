@@ -85,6 +85,17 @@ then
     exit 1
 fi
 
+if [[ "$OVERWRITE_HOME_PARTITION" == 'n' && ! -d "/home/$username" ]]
+then
+    printf "\n\e[31m%s %s %s %s %s\e[0m\n" \
+        "[!] /home/$username doesn't exist. When you're not overwriting the" \
+        "/home partition you must use the username that already exists on" \
+        "that partition. Use ls /mnt/home to see the existing users home," \
+        "then Change the username in /tmp/activate_installation_variables.sh" \
+        "to match it. After those steps re-run start_install.sh"
+    exit 1
+fi
+
 if [[ -n "$APT_CACHE_SERVER" && -n "$APT_CACHE_FILE" ]]
 then
     if ! grep "Acquire::http::Proxy \"$APT_CACHE_SERVER\";" \
