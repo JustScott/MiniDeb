@@ -1,29 +1,30 @@
 # DebianInstaller
 
-Scripts to setup a minimal, opinionated, Gnome-based Debian Linux system.
+Scripts to setup a minimal Debian Linux system.
 
 ## Usage
 
-First, create 3 partitions:
+First, create 4 partitions:
   * 1GB EFI partition
   * 1GB boot partition
-  * root partition with the remaining disk space
+  * 20GB boot partition # Can make however large you need
+  * home partition with the remaining disk space
 
 ```bash
 sudo -i # become root now for running later commands
 cfdisk /dev/disk
 ```
 
-Second, create a 1GB partition on your USB stick
-  * Then add it to the value of `KEYFILE_PARTITION` in `install_constants` 
+Second, create a partition on your USB stick (should be atleast 10MB)
 
 Third, ensure you are connected to Ethernet or WiFi. Then clone the repository 
 and run `start_install.sh`:
 
 ```bash
 apt update
-apt install git
+apt install -y git
 git clone https://www.github.com/JustScott/DebianInstaller
+nano ./DebianInstaller/install_constants # Populate the relevant variables
 bash ./DebianInstaller/start_install.sh # run as root
 ```
 

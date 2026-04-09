@@ -360,7 +360,13 @@ fi
 
 if ! id administrator &>/dev/null
 then
-    useradd -Um -s /bin/bash administrator \
+    home_flag='--create-home'
+    if [[ -d '/home/administrator' ]]
+    then
+        home_flag='--no-create-home'
+    fi
+
+    useradd --user-group $home_flag --uid 1000 -s /bin/bash administrator \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Create administrator account"
     [[ $? -ne 0 ]] && exit 1
@@ -387,10 +393,15 @@ echo administrator:"$admin_password" | chpasswd \
 task_output $! "$STDERR_LOG_PATH" "Set administrator password"
 [[ $? -ne 0 ]] && exit 1
 
-# TODO: Don't create a new home if it already exists
 if ! id $username &>/dev/null
 then
-    useradd -Um -s /bin/bash $username  \
+    home_flag='--create-home'
+    if [[ -d "/home/$username" ]]
+    then
+        home_flag='--no-create-home'
+    fi
+
+    useradd --user-group $home_flag --uid 1001 -s /bin/bash $username \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Create user account: '$username'"
     [[ $? -ne 0 ]] && exit 1

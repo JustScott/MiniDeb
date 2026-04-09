@@ -109,12 +109,6 @@ fi
 
 check_required_install_constants()
 {
-    if [[ -z "$DISK" ]]
-    then
-        printf "\n\e[31m%s\e[0m\n" \
-            "[!] \$DISK constant not set, this is fatal...stopping"
-        return 1
-    fi
     if [[ -z "$EFI_PARTITION" ]]
     then
         printf "\n\e[31m%s\e[0m\n" \
@@ -133,6 +127,19 @@ check_required_install_constants()
             "[!] \$ROOT_PARTITION constant not set, this is fatal...stopping"
         return 1
     fi
+    if [[ -z "$HOME_PARTITION" ]]
+    then
+        printf "\n\e[31m%s\e[0m\n" \
+            "[!] \$HOME_PARTITION constant not set, this is fatal...stopping"
+        return 1
+    fi
+    if [[ "$OVERWRITE_HOME_PARTITION" != 'y' && "$OVERWRITE_HOME_PARTITION" != 'n' ]]
+    then
+        printf "\n\e[31m%s %s\e[0m\n" \
+            "[!] \$OVERWRITE_HOME_PARTITION constant must be 'y' or 'n'," \
+            "this is fatal...stopping"
+        return 1
+    fi
     if [[ -z "$KEYFILE_PARTITION" ]]
     then
         printf "\n\e[31m%s\e[0m\n" \
@@ -144,29 +151,6 @@ check_required_install_constants()
 }
 
 check_required_install_constants || exit 1
-
-check_root_UUID()
-{
-    if [[ -z "$ENCRYPTED_PARTITION_UUID" ]]
-    then
-        printf "\n\n\e[31m%s %s %s\e[0m\n\n" \
-            "[!] Can't find UUID for partition $ROOT_PARTITION. Remember to" \
-            "create a 1GB EFI partition and Linux Filesystem partition with" \
-            "the remaining space before running start_install.sh"
-        return 1
-    fi
-
-    if ! blkid | grep "$ENCRYPTED_PARTITION_UUID" &>/dev/null
-    then
-        printf "\n\n\e[31m%s %s %s\e[0m\n\n" \
-            "[!] '$ROOT_PARTITION' UUID not found in blkid output. Remember" \
-            "to create a 1GB EFI partition and Linux Filesystem partition" \
-            "with the remaining space before running start_install.sh"
-        return 1
-    fi
-
-    return 0
-}
 
 check_for_cache_server()
 {
@@ -191,8 +175,8 @@ check_for_cache_server()
 
 check_for_cache_server || exit 1
 
-# We should remove the admin_password from the install variables file
-# if set_admin_password isn't in the completion file, because it could
+# Remove the admin_password from the install variables file if
+# set_admin_password isn't in the completion file, because it could
 # mean the user wants to enter a new password
 if ! grep "^set_admin_password$" $COMPLETION_FILE &>/dev/null
 then
@@ -263,7 +247,7 @@ then
     [[ $? -ne 0 ]] && exit 1
 fi
 
-if ! grep "^luksFormat$" $COMPLETION_FILE &>/dev/null
+if ! grep "^luksFormatRoot$" $COMPLETION_FILE &>/dev/null
 then
     cryptsetup luksFormat --key-file /media/keyfile_usb/luks_keyfile \
         --batch-mode $ROOT_PARTITION \
@@ -271,17 +255,41 @@ then
     task_output $! "$STDERR_LOG_PATH" "luksFormat $ROOT_PARTITION with USB keyfile"
     [[ $? -ne 0 ]] && exit 1
 
-    echo "luksFormat" >> $COMPLETION_FILE
+    echo "luksFormatRoot" >> $COMPLETION_FILE
 fi
 
-if ! grep "^luksOpen$" $COMPLETION_FILE &>/dev/null
+if [[ $OVERWRITE_HOME_PARTITION == 'y' ]]
+then
+    if ! grep "^luksFormatHome$" $COMPLETION_FILE &>/dev/null
+    then
+        cryptsetup luksFormat --key-file /media/keyfile_usb/luks_keyfile \
+            --batch-mode $HOME_PARTITION \
+            >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" "luksFormat $HOME_PARTITION with USB keyfile"
+        [[ $? -ne 0 ]] && exit 1
+
+        echo "luksFormatHome" >> $COMPLETION_FILE
+    fi
+fi
+
+if ! grep "^luksOpenRoot$" $COMPLETION_FILE &>/dev/null
 then
     cryptsetup open --key-file /media/keyfile_usb/luks_keyfile \
-        $ROOT_PARTITION cryptdisk >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        $ROOT_PARTITION crypt_root >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "open luks encrypted root partition"
     [[ $? -ne 0 ]] && exit 1
 
-    echo "luksOpen" >> $COMPLETION_FILE
+    echo "luksOpenRoot" >> $COMPLETION_FILE
+fi
+
+if ! grep "^luksOpenHome$" $COMPLETION_FILE &>/dev/null
+then
+    cryptsetup open --key-file /media/keyfile_usb/luks_keyfile \
+        $HOME_PARTITION crypt_home >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "open luks encrypted home partition"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "luksOpenHome" >> $COMPLETION_FILE
 fi
 
 if ! cmp -s ./DebianInstaller/configuration_files/sources.list \
@@ -362,9 +370,22 @@ then
     echo "mkfs_boot" >> $COMPLETION_FILE
 fi
 
+if [[ $OVERWRITE_HOME_PARTITION == 'y' ]]
+then
+    if ! grep "^mkfs_home$" $COMPLETION_FILE &>/dev/null
+    then
+        echo 'y' | mkfs.ext4 /dev/mapper/crypt_home \
+            >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" "Format home partition with EXT4"
+        [[ $? -ne 0 ]] && exit 1
+
+        echo "mkfs_home" >> $COMPLETION_FILE
+    fi
+fi
+
 if ! grep "^mkfs_root$" $COMPLETION_FILE &>/dev/null
 then
-    echo 'y' | mkfs.ext4 /dev/mapper/cryptdisk \
+    echo 'y' | mkfs.ext4 /dev/mapper/crypt_root \
         >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Format root partition with EXT4"
     [[ $? -ne 0 ]] && exit 1
@@ -374,11 +395,21 @@ fi
 
 if ! grep "^mount_root$" $COMPLETION_FILE &>/dev/null
 then
-    mount /dev/mapper/cryptdisk /mnt >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    mount /dev/mapper/crypt_root /mnt >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
     task_output $! "$STDERR_LOG_PATH" "Mount the root partition"
     [[ $? -ne 0 ]] && exit 1
 
     echo "mount_root" >> $COMPLETION_FILE
+fi
+
+if ! grep "^mount_home$" $COMPLETION_FILE &>/dev/null
+then
+    mount --mkdir /dev/mapper/crypt_home /mnt/home \
+        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Mount the home partition"
+    [[ $? -ne 0 ]] && exit 1
+
+    echo "mount_home" >> $COMPLETION_FILE
 fi
 
 if ! grep "^mount_boot$" $COMPLETION_FILE &>/dev/null
@@ -401,23 +432,38 @@ then
     echo "mount_efi" >> $COMPLETION_FILE
 fi
 
-if ! grep "^mkswap$" $COMPLETION_FILE &>/dev/null
+if [[ -n "$SWAP_SIZE_IN_GB" ]]
 then
-    mkswap -U clear --size 4G --file /mnt/swapfile \
-        >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Create 4GB swapfile"
-    [[ $? -ne 0 ]] && exit 1
+    if ! [[ "$SWAP_SIZE_IN_GB" =~ ^[1-9][0-9]*$ ]]
+    then
+        printf "\n\e[31m%s\e[0m\n" "[!] Invalid swap size: '$SWAP_SIZE_IN_GB'"
+        exit 1
+    fi
 
-    echo "mkswap" >> $COMPLETION_FILE
-fi
+    if [[ "$SWAP_SIZE_IN_GB" -gt 32 ]]
+    then
+        printf "\n\e[31m%s\e[0m\n" "[!] Max swap size is 32GB"
+        exit 1
+    fi
 
-if ! grep "^swapon$" $COMPLETION_FILE &>/dev/null
-then
-    swapon /mnt/swapfile >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Enable the swapfile"
-    [[ $? -ne 0 ]] && exit 1
+    if ! grep "^mkswap$" $COMPLETION_FILE &>/dev/null
+    then
+        mkswap -U clear --size ${SWAP_SIZE_IN_GB}G --file /mnt/swapfile \
+            >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" "Create ${SWAP_SIZE_IN_GB}GB swapfile"
+        [[ $? -ne 0 ]] && exit 1
 
-    echo "swapon" >> $COMPLETION_FILE
+        echo "mkswap" >> $COMPLETION_FILE
+    fi
+
+    if ! grep "^swapon$" $COMPLETION_FILE &>/dev/null
+    then
+        swapon /mnt/swapfile >>"$STDOUT_LOG_PATH" 2>>"$STDERR_LOG_PATH" &
+        task_output $! "$STDERR_LOG_PATH" "Enable the swapfile"
+        [[ $? -ne 0 ]] && exit 1
+
+        echo "swapon" >> $COMPLETION_FILE
+    fi
 fi
 
 if ! grep "^run_debootstrap$" $COMPLETION_FILE &>/dev/null
@@ -457,22 +503,43 @@ then
     echo "genfstab" >> $COMPLETION_FILE
 fi
 
-ENCRYPTED_PARTITION_UUID="$(blkid -s UUID -o value $ROOT_PARTITION)"
+ENCRYPTED_ROOT_PARTITION_UUID="$(blkid -s UUID -o value $ROOT_PARTITION)"
+ENCRYPTED_HOME_PARTITION_UUID="$(blkid -s UUID -o value $HOME_PARTITION)"
 
-check_root_UUID || exit 1
-
-if ! grep "$ENCRYPTED_PARTITION_UUID" /mnt/etc/crypttab &>/dev/null
+if [[ -z "$ENCRYPTED_ROOT_PARTITION_UUID" ]]
 then
-    if ! [[ -d /mnt/etc/ ]]
-    then
-        mkdir -p /mnt/etc 1>/dev/null 2>>"$STDERR_LOG_PATH" &
-        task_output $! "$STDERR_LOG_PATH" "Create /mnt/etc for crypttab"
-        [[ $? -ne 0 ]] && exit 1
-    fi
+    printf "\n\e[31m%s\e[0m\n" \
+        "[!] Couldn't find encrypted root partition in blkid output"
+    exit 1
+fi
 
-    echo "cryptdisk UUID=$ENCRYPTED_PARTITION_UUID /dev/disk/by-label/keyfile_usb:/luks_keyfile:20 luks,discard,keyscript=/lib/cryptsetup/scripts/passdev,tries=1" \
+if [[ -z "$ENCRYPTED_HOME_PARTITION_UUID" ]]
+then
+    printf "\n\e[31m%s\e[0m\n" \
+        "[!] Couldn't find encrypted home partition in blkid output"
+    exit 1
+fi
+
+if ! [[ -d /mnt/etc/ ]]
+then
+    mkdir -p /mnt/etc 1>/dev/null 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Create /mnt/etc for crypttab"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+if ! grep "$ENCRYPTED_ROOT_PARTITION_UUID" /mnt/etc/crypttab &>/dev/null
+then
+    echo "crypt_root UUID=$ENCRYPTED_ROOT_PARTITION_UUID /dev/disk/by-label/keyfile_usb:/luks_keyfile:60 luks,discard,keyscript=/lib/cryptsetup/scripts/passdev,tries=2" \
         > /mnt/etc/crypttab 2>>"$STDERR_LOG_PATH" &
-    task_output $! "$STDERR_LOG_PATH" "Populate /mnt/etc/crypttab"
+    task_output $! "$STDERR_LOG_PATH" "Add encrypted root to /mnt/etc/crypttab"
+    [[ $? -ne 0 ]] && exit 1
+fi
+
+if ! grep "$ENCRYPTED_HOME_PARTITION_UUID" /mnt/etc/crypttab &>/dev/null
+then
+    echo "crypt_home UUID=$ENCRYPTED_HOME_PARTITION_UUID /dev/disk/by-label/keyfile_usb:/luks_keyfile:60 luks,discard,keyscript=/lib/cryptsetup/scripts/passdev,tries=2,initramfs" \
+        >> /mnt/etc/crypttab 2>>"$STDERR_LOG_PATH" &
+    task_output $! "$STDERR_LOG_PATH" "Add encrypted home to /mnt/etc/crypttab"
     [[ $? -ne 0 ]] && exit 1
 fi
 
