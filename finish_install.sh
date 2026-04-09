@@ -61,6 +61,8 @@ then
     exit 1
 fi
 
+declare -r STDERR_LOG_PATH="/debianinstallererrors.log"
+
 if ! source $INSTALLATION_VARIABLES_FILE &>/dev/null
 then
     printf "\n\n\e[31m%s %s\e[0m\n\n" \
